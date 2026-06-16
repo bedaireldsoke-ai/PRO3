@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>脂肪肝项目初筛表</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;color:#333;font-size:14px}
+.page-header{background:linear-gradient(135deg,#1a6b3c,#2e9e5f);color:#fff;padding:18px 30px;display:flex;align-items:center;gap:12px}
+.page-header h1{font-size:20px;font-weight:700}
+.page-header span{font-size:13px;opacity:.8}
+.tabs{display:flex;background:#fff;border-bottom:2px solid #e0e0e0;padding:0 24px}
+.tab-btn{padding:12px 28px;cursor:pointer;font-size:14px;font-weight:500;border:none;background:none;color:#666;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab-btn.active{color:#1a6b3c;border-bottom-color:#1a6b3c;font-weight:700}
+.tab-content{display:none;padding:20px 24px 40px}
+.tab-content.active{display:block}
+.card{background:#fff;border-radius:8px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.card-title{font-size:15px;font-weight:700;color:#1a6b3c;border-left:4px solid #1a6b3c;padding-left:10px;margin-bottom:16px}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:12px;color:#555;font-weight:500}
+.form-group label .req{color:#e53935;margin-left:2px}
+.form-group input,.form-group select{border:1px solid #ccd;border-radius:5px;padding:7px 10px;font-size:13px;width:100%;transition:border .2s}
+.form-group input:focus,.form-group select:focus{border-color:#1a6b3c;outline:none}
+.drink-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+.drink-table th{background:#e8f5e9;padding:8px 10px;text-align:center;font-weight:600;border:1px solid #c8e6c9}
+.drink-table td{padding:7px 10px;border:1px solid #e0e0e0;text-align:center;vertical-align:middle}
+.drink-table input[type=number]{width:80px;border:1px solid #ccd;border-radius:4px;padding:5px 7px;font-size:13px;text-align:center}
+.drink-table select{width:70px;border:1px solid #ccd;border-radius:4px;padding:5px 4px;font-size:13px}
+.drink-disabled{opacity:.4;pointer-events:none}
+.pro-table{width:100%;border-collapse:collapse;font-size:13px}
+.pro-table th{background:#e8f5e9;padding:8px;border:1px solid #c8e6c9;text-align:center;font-weight:600}
+.pro-table td{border:1px solid #e0e0e0;padding:8px 10px}
+.pro-table td:first-child{width:52%;color:#444}
+.pro-table select{width:100%;border:1px solid #ccd;border-radius:4px;padding:6px;font-size:13px}
+.pro-hint{font-size:11px;color:#777;margin-bottom:10px;background:#fffde7;padding:8px 12px;border-radius:4px;border-left:3px solid #fbc02d}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 22px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:all .2s}
+.btn-primary{background:#1a6b3c;color:#fff}
+.btn-primary:hover{background:#155c33}
+.btn-danger{background:#e53935;color:#fff}
+.btn-danger:hover{background:#c62828}
+.btn-export{background:#1565c0;color:#fff}
+.btn-export:hover{background:#0d47a1}
+.btn-gray{background:#e0e0e0;color:#555}
+.btn-bar{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.records-info{font-size:13px;color:#666;margin-bottom:12px}
+.records-info strong{color:#1a6b3c}
+.table-wrap{overflow-x:auto;margin-top:12px}
+.mini-table{border-collapse:collapse;font-size:12px;width:100%;min-width:600px}
+.mini-table th{background:#e8f5e9;padding:7px 10px;border:1px solid #c8e6c9;font-weight:600;white-space:nowrap}
+.mini-table td{border:1px solid #e0e0e0;padding:6px 10px;white-space:nowrap}
+.mini-table tr:hover td{background:#f9fbe7}
+.del-btn{background:none;border:none;color:#e53935;cursor:pointer;font-size:12px;padding:2px 6px}
+.del-btn:hover{text-decoration:underline}
+.empty-hint{text-align:center;color:#aaa;padding:30px;font-size:13px}
+.tip{font-size:12px;color:#888;margin-top:4px}
+.section-sub{font-size:12px;color:#777;margin-bottom:10px;padding:6px 10px;background:#f5f5f5;border-radius:4px}
+.flag-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+.flag-item{display:flex;align-items:center;gap:6px;min-width:200px}
+.flag-item label{font-size:13px;color:#444;cursor:pointer}
+.flag-item input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#1a6b3c}
+.drug-row{display:flex;flex-wrap:wrap;gap:16px;margin-top:4px}
+.drug-item{display:flex;align-items:center;gap:8px}
+.drug-item label{font-size:13px;color:#444;white-space:nowrap}
+.drug-item select{width:80px;border:1px solid #ccd;border-radius:4px;padding:5px 6px;font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+  <div>
+    <h1>脂肪肝项目初筛表</h1>
+    <span>临床研究数据采集系统</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('form')">📋 填写问卷</button>
+  <button class="tab-btn" onclick="switchTab('export')">📊 数据导出</button>
+</div>
+
+<div id="tab-form" class="tab-content active">
+  <div class="card">
+    <div class="card-title">基本信息</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>序号</label>
+        <input type="text" id="f_sn" placeholder="自动或手动填写">
+      </div>
+      <div class="form-group">
+        <label>姓名<span class="req">*</span></label>
+        <input type="text" id="f_name" placeholder="请输入患者姓名">
+      </div>
+      <div class="form-group">
+        <label>年龄（岁）</label>
+        <input type="number" id="f_age" min="0" max="120" placeholder="岁">
+      </div>
+      <div class="form-group">
+        <label>性别</label>
+        <select id="f_sex">
+          <option value="">请选择</option>
+          <option value="男">男</option>
+          <option value="女">女</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>民族</label>
+        <input type="text" id="f_nation" placeholder="如：汉族">
+      </div>
+      <div class="form-group">
+        <label>手机号</label>
+        <input type="tel" id="f_phone" placeholder="11位手机号">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">第 1 题：近一年，您平常是否饮酒？</div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:13px;margin-right:18px">
+        <input type="radio" name="drink_overall" value="yes" onchange="toggleDrink(true)"> 是（请填写以下饮酒情况）
+      </label>
+      <label style="font-size:13px">
+        <input type="radio" name="drink_overall" value="no" checked onchange="toggleDrink(false)"> 否（以下表格可不填）
+      </label>
+    </div>
+    <div id="drink_table_wrap" class="drink-disabled">
+      <table class="drink-table">
+        <thead>
+          <tr>
+            <th>酒类</th>
+            <th>是否喝</th>
+            <th>平均一次喝几两（两/次）</th>
+            <th>平均一周喝几次（次/周）</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>白酒</td>
+            <td><select id="d_bj_y"><option value="0">否</option><option value="1">是</option></select></td>
+            <td><input type="number" id="d_bj_liang" min="0" step="0.1" placeholder="0"></td>
+            <td><input type="number" id="d_bj_ci" min="0" step="0.5" placeholder="0"></td>
+          </tr>
+          <tr>
+            <td>红酒</td>
+            <td><select id="d_hj_y"><option value="0">否</option><option value="1">是</option></select></td>
+            <td><input type="number" id="d_hj_liang" min="0" step="0.1" placeholder="0"></td>
+            <td><input type="number" id="d_hj_ci" min="0" step="0.5" placeholder="0"></td>
+          </tr>
+          <tr>
+            <td>啤酒</td>
+            <td><select id="d_pj_y"><option value="0">否</option><option value="1">是</option></select></td>
+            <td><input type="number" id="d_pj_liang" min="0" step="0.1" placeholder="0"></td>
+            <td><input type="number" id="d_pj_ci" min="0" step="0.5" placeholder="0"></td>
+          </tr>
+          <tr>
+            <td>
+              其他：<input type="text" id="d_other_name" placeholder="酒类名称" style="width:90px;border:1px solid #ccd;border-radius:4px;padding:4px 6px;font-size:12px">
+            </td>
+            <td><select id="d_other_y"><option value="0">否</option><option value="1">是</option></select></td>
+            <td><input type="number" id="d_other_liang" min="0" step="0.1" placeholder="0"></td>
+            <td><input type="number" id="d_other_ci" min="0" step="0.5" placeholder="0"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tip" style="margin-top:8px">※ 其他酒类数据仅做记录，不参与酒精量自动计算</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">PRO 量表评分（Q1–Q10）</div>
+    <div class="pro-hint">
+      评分标准：<strong>0分</strong> 从未/无 ｜ <strong>20分</strong> 偶尔/轻 ｜ <strong>40分</strong> 较多/一般 ｜ <strong>80分</strong> 经常/较重 ｜ <strong>100分</strong> 频繁/严重
+    </div>
+    <table class="pro-table">
+      <thead>
+        <tr>
+          <th style="text-align:left">条目</th>
+          <th style="width:200px">评分选择</th>
+        </tr>
+      </thead>
+      <tbody id="pro-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">体格检查</div>
+    <div class="form-grid">
+      <div class="form-group"><label>身高（cm）</label><input type="number" id="f_height" min="50" max="250" step="0.1" placeholder="cm"></div>
+      <div class="form-group"><label>体重（kg）</label><input type="number" id="f_weight" min="10" max="300" step="0.1" placeholder="kg"></div>
+      <div class="form-group"><label>腰围（cm）</label><input type="number" id="f_waist" min="30" max="200" step="0.1" placeholder="cm"></div>
+      <div class="form-group"><label>臀围（cm）</label><input type="number" id="f_hip" min="30" max="200" step="0.1" placeholder="cm"></div>
+      <div class="form-group"><label>握力（kg）</label><input type="number" id="f_grip" min="0" max="100" step="0.1" placeholder="kg"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">血压测量</div>
+    <div class="form-grid">
+      <div class="form-group"><label>收缩压（mmHg）</label><input type="number" id="f_sbp" min="50" max="300" placeholder="mmHg"></div>
+      <div class="form-group"><label>舒张压（mmHg）</label><input type="number" id="f_dbp" min="30" max="200" placeholder="mmHg"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">影像检查</div>
+    <div class="form-grid">
+      <div class="form-group"><label>CAP 值（dB/m）</label><input type="number" id="f_cap" min="100" max="400" step="1" placeholder="dB/m（≥238 为异常）"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">实验室检查</div>
+    <div class="form-grid">
+      <div class="form-group"><label>ALT（U/L）</label><input type="number" id="f_alt" min="0" step="0.1" placeholder="U/L"></div>
+      <div class="form-group"><label>γ-GT（U/L）</label><input type="number" id="f_ggt" min="0" step="0.1" placeholder="U/L"></div>
+      <div class="form-group"><label>AST（U/L）</label><input type="number" id="f_ast" min="0" step="0.1" placeholder="U/L"></div>
+      <div class="form-group"><label>TG（mmol/L）</label><input type="number" id="f_tg" min="0" step="0.01" placeholder="mmol/L（>1.70 异常）"></div>
+      <div class="form-group"><label>HDL-C（mmol/L）</label><input type="number" id="f_hdl" min="0" step="0.01" placeholder="男<1.0 / 女<1.3 异常"></div>
+      <div class="form-group"><label>FPG（mmol/L）</label><input type="number" id="f_fpg" min="0" step="0.01" placeholder="mmol/L"></div>
+      <div class="form-group"><label>HbA1c（%）</label><input type="number" id="f_hba1c" min="0" step="0.1" placeholder="%"></div>
+      <div class="form-group"><label>FINS（mU/L）</label><input type="number" id="f_fins" min="0" step="0.01" placeholder="mU/L（用于计算HOMA-IR）"></div>
+      <div class="form-group"><label>hs-CRP（mg/L）</label><input type="number" id="f_crp" min="0" step="0.01" placeholder="mg/L（>2 异常）"></div>
+      <div class="form-group">
+        <label>HBsAg（乙肝表面抗原）</label>
+        <select id="f_hbsag">
+          <option value="">未检测</option>
+          <option value="阴性">阴性（－）</option>
+          <option value="阳性">阳性（＋）</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Anti-HCV（丙肝抗体）</label>
+        <select id="f_hcv">
+          <option value="">未检测</option>
+          <option value="阴性">阴性（－）</option>
+          <option value="阳性">阳性（＋）</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">用药情况</div>
+    <div class="drug-row">
+      <div class="drug-item">
+        <label>服降糖药：</label>
+        <select id="f_drug_dm"><option value="0">否（0）</option><option value="1">是（1）</option></select>
+      </div>
+      <div class="drug-item">
+        <label>服降压药：</label>
+        <select id="f_drug_bp"><option value="0">否（0）</option><option value="1">是（1）</option></select>
+      </div>
+      <div class="drug-item">
+        <label>服降脂药：</label>
+        <select id="f_drug_lip"><option value="0">否（0）</option><option value="1">是（1）</option></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">临床信息（需医生确认）</div>
+    <div class="section-sub">以下信息由研究人员或医生根据病史判断填写，将直接写入导出表格。</div>
+    <div class="flag-row">
+      <div class="flag-item"><input type="checkbox" id="f_t2dm" value="1"><label for="f_t2dm">已确诊 2型糖尿病</label></div>
+      <div class="flag-item"><input type="checkbox" id="f_fatty_liver" value="1"><label for="f_fatty_liver">已确诊 脂肪肝</label></div>
+      <div class="flag-item"><input type="checkbox" id="f_alt_long" value="1"><label for="f_alt_long">AST或ALT 持续升高≥6个月（≥2次检测，间隔≥4周）</label></div>
+    </div>
+    <div style="margin-top:16px">
+      <div class="card-title" style="font-size:13px;margin-bottom:10px">疾病排除标准（1=符合入组/否）</div>
+      <div class="flag-row">
+        <div class="flag-item"><input type="checkbox" id="f_exc1" value="1"><label for="f_exc1">疾病① 无肝病类排除</label></div>
+        <div class="flag-item"><input type="checkbox" id="f_exc2" value="1"><label for="f_exc2">疾病② 无内分泌/肾病排除</label></div>
+        <div class="flag-item"><input type="checkbox" id="f_exc3" value="1"><label for="f_exc3">疾病③ 无妊娠/备孕排除</label></div>
+        <div class="flag-item"><input type="checkbox" id="f_exc4" value="1"><label for="f_exc4">疾病④ 无心脑血管排除</label></div>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <div class="flag-row">
+        <div class="flag-item"><input type="checkbox" id="f_join" value="1"><label for="f_join">同意参与研究（1=是）</label></div>
+        <div class="flag-item"><input type="checkbox" id="f_consent" value="1"><label for="f_consent">已签署知情同意书（1=是）</label></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-bar">
+    <button class="btn btn-primary" onclick="addRecord()">✅ 添加至导出列表</button>
+    <button class="btn btn-gray" onclick="resetForm()">🔄 清空表单</button>
+  </div>
+</div>
+
+<!-- 数据导出 Tab -->
+<div id="tab-export" class="tab-content">
+
+  <!-- 管理员解锁卡片 -->
+  <div class="card" id="admin-lock-card">
+    <div class="card-title">🔐 管理员验证</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input type="password" id="admin-pass" placeholder="请输入管理密码"
+        style="border:1px solid #ccd;border-radius:5px;padding:7px 12px;font-size:14px;width:220px"
+        onkeydown="if(event.key==='Enter')unlockAdmin()">
+      <button class="btn btn-primary" onclick="unlockAdmin()">解锁管理功能</button>
+    </div>
+    <div id="admin-tip" style="margin-top:8px;font-size:12px;color:#e53935;display:none">❌ 密码错误，请重试</div>
+  </div>
+
+  <!-- 解锁后才显示的内容 -->
+  <div id="admin-actions" style="display:none">
+    <div class="card">
+      <div class="card-title">数据导出</div>
+      <div class="records-info">
+        当前已录入 <strong id="rec-count">0</strong> 条记录。导出 Excel 时，所有公式列（BMI、HOMA-IR、PRO 总分、MASLD 诊断等）将以 <strong>Excel 公式</strong> 形式嵌入，打开即自动计算。
+      </div>
+      <div class="btn-bar">
+        <button class="btn btn-export" onclick="exportExcel()">⬇️ 导出 Excel (.xlsx)</button>
+        <button class="btn btn-danger" onclick="clearAll()">🗑️ 清空全部记录</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">已录入记录预览（仅显示基本信息）</div>
+      <div class="table-wrap">
+        <table class="mini-table" id="preview-table">
+          <thead>
+            <tr>
+              <th>序号</th><th>姓名</th><th>年龄</th><th>性别</th>
+              <th>PRO评分</th><th>CAP值</th><th>FPG</th><th>BMI（预览）</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="preview-tbody">
+            <tr><td colspan="9" class="empty-hint">暂无记录，请先填写问卷并添加</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== Firebase 配置 =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCR_U1gvWp5Sv3LqSoCSCvNyXOXdleOUiU",
+  authDomain: "fat-liver-screening.firebaseapp.com",
+  databaseURL: "https://fat-liver-screening-default-rtdb.firebaseio.com",
+  projectId: "fat-liver-screening",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const RECORDS_REF = db.ref('fatLiverRecords');
+
+// ===== 管理员密码 =====
+const ADMIN_PASSWORD = 'yyk3020';
+let adminUnlocked = false;
+
+// ===== 数据存储（Firebase） =====
+let records = [];
+RECORDS_REF.on('value', snap => {
+  const val = snap.val();
+  records = val ? Object.values(val) : [];
+  if (adminUnlocked) updatePreview();
+});
+
+function saveRecords() {
+  RECORDS_REF.set(
+    records.reduce((acc, r, i) => { acc[i] = r; return acc; }, {})
+  );
+}
+
+function unlockAdmin() {
+  if (document.getElementById('admin-pass').value === ADMIN_PASSWORD) {
+    adminUnlocked = true;
+    document.getElementById('admin-actions').style.display = 'block';
+    document.getElementById('admin-lock-card').style.display = 'none';
+    updatePreview();
+  } else {
+    document.getElementById('admin-tip').style.display = 'block';
+  }
+}
+
+// ===== PRO 题目 =====
+const PRO_QUESTIONS = [
+  {id:'q1',  wVal:0.20, label:'Q1 — 您是否自觉胸闷，或腹部胃脘胀闷不适？',             weight:'20%'},
+  {id:'q2',  wVal:0.10, label:'Q2 — 您是否自觉口苦口臭？',                             weight:'10%'},
+  {id:'q3',  wVal:0.05, label:'Q3 — 您近期是否食欲减退，或食量较平常下降？',            weight:'5%'},
+  {id:'q4',  wVal:0.05, label:'Q4 — 您小便是否颜色偏黄，或有灼热甚至痛感？',            weight:'5%'},
+  {id:'q5',  wVal:0.10, label:'Q5 — 您是否自觉口渴，但是却饮水不多？',                  weight:'10%'},
+  {id:'q6',  wVal:0.10, label:'Q6 — 您是否自觉身体困重，疲乏无力？',                    weight:'10%'},
+  {id:'q7',  wVal:0.05, label:'Q7 — 您是否发热？或自觉发热，但触摸皮肤却觉温度不高？', weight:'5%'},
+  {id:'q8',  wVal:0.15, label:'Q8 — 您是否大便不爽，会粘在马桶内？',                    weight:'15%'},
+  {id:'q9',  wVal:0.10, label:'Q9 — 您是否自觉头面皮肤及毛发油腻，或下身阴部潮湿？',   weight:'10%'},
+  {id:'q10', wVal:0.10, label:'Q10 — 您是否舌苔发黄发腻，不易刮去？',                   weight:'10%'}
+];
+
+function buildProTable() {
+  const tbody = document.getElementById('pro-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  PRO_QUESTIONS.forEach(q => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${q.label}<span style="color:#888;font-size:11px">（权重 ${q.weight}）</span></td>
+      <td>
+        <select id="pro_${q.id}" style="width:100%;border:1px solid #ccd;border-radius:4px;padding:6px;font-size:13px">
+          <option value="0">0分 — 从未/无</option>
+          <option value="20">20分 — 偶尔/轻</option>
+          <option value="40">40分 — 较多/一般</option>
+          <option value="80">80分 — 经常/较重</option>
+          <option value="100">100分 — 频繁/严重</option>
+        </select>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+window.onload = function() {
+  buildProTable();
+};
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const btns = document.querySelectorAll('.tab-btn');
+  if (name === 'form') btns[0].classList.add('active');
+  if (name === 'export') { btns[1].classList.add('active'); if (adminUnlocked) updatePreview(); }
+}
+
+function toggleDrink(yes) {
+  const wrap = document.getElementById('drink_table_wrap');
+  yes ? wrap.classList.remove('drink-disabled') : wrap.classList.add('drink-disabled');
+}
+
+let editIdx = -1;
+
+function calcProScore() {
+  return Math.round(PRO_QUESTIONS.reduce((sum, q) => {
+    const sel = document.getElementById('pro_' + q.id);
+    return sum + (sel ? parseFloat(sel.value) * q.wVal : 0);
+  }, 0) * 10) / 10;
+}
+function calcProScoreFromRecord(r) {
+  return Math.round(PRO_QUESTIONS.reduce((sum, q) => {
+    return sum + ((parseFloat(r[q.id]) || 0) * q.wVal);
+  }, 0) * 10) / 10;
+}
+
+function addRecord() {
+  const name = document.getElementById('f_name').value.trim();
+  if (!name) { alert('请填写患者姓名！'); return; }
+
+  const drinkRadio = document.querySelector('input[name="drink_overall"]:checked');
+  const isDrink = drinkRadio && drinkRadio.value === 'yes';
+
+  const proScores = {};
+  PRO_QUESTIONS.forEach(q => {
+    const sel = document.getElementById('pro_' + q.id);
+    proScores[q.id] = sel ? parseInt(sel.value) || 0 : 0;
+  });
+
+  const height = parseFloat(document.getElementById('f_height').value) || '';
+  const weight = parseFloat(document.getElementById('f_weight').value) || '';
+  const bmi = (height && weight) ? Math.round(weight / Math.pow(height / 100, 2) * 10) / 10 : '';
+
+  const fpg = parseFloat(document.getElementById('f_fpg').value) || '';
+  const fins = parseFloat(document.getElementById('f_fins').value) || '';
+  const homaIR = (fpg && fins) ? Math.round(fpg * fins / 22.5 * 100) / 100 : '';
+
+  const record = {
+    sn: document.getElementById('f_sn').value.trim() || (records.length + 1),
+    name,
+    age: document.getElementById('f_age').value,
+    sex: document.getElementById('f_sex').value,
+    nation: document.getElementById('f_nation').value,
+    phone: document.getElementById('f_phone').value,
+    d_bj_y: document.getElementById('d_bj_y').value,
+    d_bj_liang: document.getElementById('d_bj_liang').value,
+    d_bj_ci: document.getElementById('d_bj_ci').value,
+    d_hj_y: document.getElementById('d_hj_y').value,
+    d_hj_liang: document.getElementById('d_hj_liang').value,
+    d_hj_ci: document.getElementById('d_hj_ci').value,
+    d_pj_y: document.getElementById('d_pj_y').value,
+    d_pj_liang: document.getElementById('d_pj_liang').value,
+    d_pj_ci: document.getElementById('d_pj_ci').value,
+    d_other_name: document.getElementById('d_other_name').value,
+    d_other_y: document.getElementById('d_other_y').value,
+    d_other_liang: document.getElementById('d_other_liang').value,
+    d_other_ci: document.getElementById('d_other_ci').value,
+    drinkYes: isDrink ? '是' : '否',
+    ...proScores,
+    proTotal: calcProScore(),
+    height, weight, bmi,
+    waist: document.getElementById('f_waist').value,
+    hip: document.getElementById('f_hip').value,
+    grip: document.getElementById('f_grip').value,
+    sbp: document.getElementById('f_sbp').value,
+    dbp: document.getElementById('f_dbp').value,
+    cap: document.getElementById('f_cap').value,
+    alt: document.getElementById('f_alt').value,
+    ggt: document.getElementById('f_ggt').value,
+    ast: document.getElementById('f_ast').value,
+    tg: document.getElementById('f_tg').value,
+    hdl: document.getElementById('f_hdl').value,
+    fpg, hba1c: document.getElementById('f_hba1c').value,
+    fins, homaIR,
+    crp: document.getElementById('f_crp').value,
+    hbsag: document.getElementById('f_hbsag').value,
+    hcv: document.getElementById('f_hcv').value,
+    drug_dm: document.getElementById('f_drug_dm').value,
+    drug_bp: document.getElementById('f_drug_bp').value,
+    drug_lip: document.getElementById('f_drug_lip').value,
+    t2dm: document.getElementById('f_t2dm').checked ? 1 : 0,
+    fatty_liver: document.getElementById('f_fatty_liver').checked ? 1 : 0,
+    alt_long: document.getElementById('f_alt_long').checked ? 1 : 0,
+    exc1: document.getElementById('f_exc1').checked ? 1 : 0,
+    exc2: document.getElementById('f_exc2').checked ? 1 : 0,
+    exc3: document.getElementById('f_exc3').checked ? 1 : 0,
+    exc4: document.getElementById('f_exc4').checked ? 1 : 0,
+    join: document.getElementById('f_join').checked ? 1 : 0,
+    consent: document.getElementById('f_consent').checked ? 1 : 0,
+    time: new Date().toLocaleString('zh-CN')
+  };
+
+  if (editIdx > -1) {
+    records[editIdx] = record;
+    editIdx = -1;
+    const btn = document.querySelector('.btn-primary');
+    if (btn) btn.innerHTML = '✅ 添加至导出列表';
+    alert(`✅ 修改成功：${name}`);
+  } else {
+    records.push(record);
+    alert(`✅ 添加成功：${name}（当前共 ${records.length} 条记录）`);
+  }
+  saveRecords();
+  resetForm(true);
+}
+
+function resetForm(skipConfirm = false) {
+  if (!skipConfirm && !confirm('确认清空当前表单？已添加的记录不受影响。')) return;
+  editIdx = -1;
+  const btn = document.querySelector('.btn-primary');
+  if (btn) btn.innerHTML = '✅ 添加至导出列表';
+  ['f_sn','f_name','f_age','f_nation','f_phone',
+   'f_height','f_weight','f_waist','f_hip','f_grip',
+   'f_sbp','f_dbp','f_cap','f_alt','f_ggt','f_ast',
+   'f_tg','f_hdl','f_fpg','f_hba1c','f_fins','f_crp',
+   'd_bj_liang','d_bj_ci','d_hj_liang','d_hj_ci',
+   'd_pj_liang','d_pj_ci','d_other_liang','d_other_ci','d_other_name'
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['f_sex','f_hbsag','f_hcv','f_drug_dm','f_drug_bp','f_drug_lip',
+   'd_bj_y','d_hj_y','d_pj_y','d_other_y'
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+  ['f_t2dm','f_fatty_liver','f_alt_long','f_exc1','f_exc2','f_exc3','f_exc4','f_join','f_consent'
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+  const noRadio = document.querySelector('input[name="drink_overall"][value="no"]');
+  if (noRadio) { noRadio.checked = true; toggleDrink(false); }
+  PRO_QUESTIONS.forEach(q => {
+    const sel = document.getElementById('pro_' + q.id);
+    if (sel) sel.selectedIndex = 0;
+  });
+}
+
+function updatePreview() {
+  const tbody = document.getElementById('preview-tbody');
+  if (!tbody) return;
+  const countEl = document.getElementById('rec-count');
+  if (countEl) countEl.textContent = records.length;
+  if (!records.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-hint">暂无记录，请先填写问卷并添加</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map((r, i) => `
+    <tr>
+      <td>${r.sn}</td><td>${r.name}</td><td>${r.age}</td><td>${r.sex}</td>
+      <td>${r.proTotal !== undefined && r.proTotal !== '' ? r.proTotal : calcProScoreFromRecord(r)}</td>
+      <td>${r.cap || '-'}</td><td>${r.fpg || '-'}</td><td>${r.bmi || '-'}</td>
+      <td>
+        <button class="del-btn" style="color:#1a6b3c;margin-right:8px" onclick="editRecord(${i})">编辑</button>
+        <button class="del-btn" onclick="deleteRecord(${i})">删除</button>
+      </td>
+    </tr>`).join('');
+}
+
+function deleteRecord(idx) {
+  if (!confirm('确认删除该条记录？')) return;
+  records.splice(idx, 1);
+  saveRecords();
+  updatePreview();
+}
+
+function editRecord(idx) {
+  const r = records[idx];
+  if (!r) return;
+  editIdx = idx;
+  switchTab('form');
+  const btn = document.querySelector('.btn-primary');
+  if (btn) btn.innerHTML = '💾 保存修改';
+  const inputMap = {
+    f_sn:'sn', f_name:'name', f_age:'age', f_nation:'nation', f_phone:'phone',
+    f_height:'height', f_weight:'weight', f_waist:'waist', f_hip:'hip', f_grip:'grip',
+    f_sbp:'sbp', f_dbp:'dbp', f_cap:'cap',
+    f_alt:'alt', f_ggt:'ggt', f_ast:'ast', f_tg:'tg', f_hdl:'hdl',
+    f_fpg:'fpg', f_hba1c:'hba1c', f_fins:'fins', f_crp:'crp',
+    d_bj_liang:'d_bj_liang', d_bj_ci:'d_bj_ci',
+    d_hj_liang:'d_hj_liang', d_hj_ci:'d_hj_ci',
+    d_pj_liang:'d_pj_liang', d_pj_ci:'d_pj_ci',
+    d_other_liang:'d_other_liang', d_other_ci:'d_other_ci', d_other_name:'d_other_name'
+  };
+  Object.keys(inputMap).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = r[inputMap[id]] !== undefined ? r[inputMap[id]] : '';
+  });
+  const selectMap = {
+    f_sex:'sex', f_hbsag:'hbsag', f_hcv:'hcv',
+    f_drug_dm:'drug_dm', f_drug_bp:'drug_bp', f_drug_lip:'drug_lip',
+    d_bj_y:'d_bj_y', d_hj_y:'d_hj_y', d_pj_y:'d_pj_y', d_other_y:'d_other_y'
+  };
+  Object.keys(selectMap).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = r[selectMap[id]] !== undefined ? String(r[selectMap[id]]) : '';
+  });
+  ['f_t2dm','f_fatty_liver','f_alt_long','f_exc1','f_exc2','f_exc3','f_exc4','f_join','f_consent'].forEach(id => {
+    const key = id.replace('f_','');
+    const el = document.getElementById(id);
+    if (el) el.checked = Number(r[key] || 0) === 1;
+  });
+  const drinkVal = r.drinkYes === '是' ? 'yes' : 'no';
+  const radio = document.querySelector(`input[name="drink_overall"][value="${drinkVal}"]`);
+  if (radio) { radio.checked = true; toggleDrink(drinkVal === 'yes'); }
+  PRO_QUESTIONS.forEach(q => {
+    const sel = document.getElementById('pro_' + q.id);
+    if (sel) sel.value = r[q.id] !== undefined ? String(r[q.id]) : '0';
+  });
+}
+
+function clearAll() {
+  if (!adminUnlocked) { alert('请先输入管理密码解锁！'); return; }
+  if (!records.length) { alert('暂无记录！'); return; }
+  if (!confirm(`确认清空全部 ${records.length} 条记录？此操作不可恢复！`)) return;
+  records = [];
+  saveRecords();
+  updatePreview();
+}
+
+function excelCol(n) {
+  let s = '';
+  while (n > 0) { const m = (n-1)%26; s = String.fromCharCode(65+m)+s; n = Math.floor((n-1)/26); }
+  return s;
+}
+
+function exportExcel() {
+  if (!adminUnlocked) { alert('请先输入管理密码解锁！'); return; }
+  if (!records.length) { alert('暂无数据，请先添加记录！'); return; }
+  if (typeof XLSX === 'undefined') { alert('XLSX 库未加载，请检查网络连接后刷新页面！'); return; }
+
+  const headers = [
+    '序号','姓名','年龄','性别','民族','手机号','身高(cm)','体重(kg)',
+    'Q1(权重20%)','Q2(权重10%)','Q3(权重5%)','Q4(权重5%)','Q5(权重10%)','Q6(权重10%)','Q7(权重5%)','Q8(权重15%)','Q9(权重10%)','Q10(权重10%)',
+    '白酒(是否)','白酒(两/次)','白酒(次/周)','红酒(是否)','红酒(两/次)','红酒(次/周)','啤酒(是否)','啤酒(两/次)','啤酒(次/周)',
+    '收缩压','舒张压','CAP值','腰围','臀围','握力',
+    '服降糖药(1=是)','服降压药(1=是)','服降脂药(1=是)',
+    'ALT(U/L)','γ-GT(U/L)','AST(U/L)','TG','HDL-C','FPG','HbA1c','FINS','hs-CRP','HBsAg（乙肝表面抗原）','Anti-HCV（丙肝抗体）',
+    '疾病①肝病类(1=否)','疾病②内分泌肾病(1=否)','疾病③妊娠备孕(1=否)','疾病④心脑血管(1=否)','是否参与研究(1=是)','签署知情同意(1=是)',
+    'PRO总分','每周酒精摄入量(g)','BMI','腰臀比','HOMA-IR','PRO总分≥29(1=是)','ALT或γ-GT异常(1=是)','符合MASLD诊断(1=是)','CAP异常(1=是)','饮酒是否超过男140g/周、女70g/周(1=是)','超重(1=是)','2型糖尿病(1=是)','代谢异常(1=是)','代谢异常项数','腰围异常(1=是)','血压异常(1=是)','TG异常(1=是)','HDL-C异常(1=是)','糖尿病前期(1=是)','FPG异常(1=是)','HbA1c异常(1=是)','胰岛素抵抗指数HOMA-IR异常(1=是)','hs-CRP异常(1=是)','AST或ALT持续升高≥6个月(1=是)'
+  ];
+
+  const wsData = [headers];
+  records.forEach(r => {
+    const blankToZero = v => (v === undefined || v === null || v === '') ? 0 : v;
+    wsData.push([
+      r.sn||'', r.name||'', r.age||'', r.sex||'', r.nation||'', r.phone||'', r.height||'', r.weight||'',
+      r.q1||0, r.q2||0, r.q3||0, r.q4||0, r.q5||0, r.q6||0, r.q7||0, r.q8||0, r.q9||0, r.q10||0,
+      Number(blankToZero(r.d_bj_y)), blankToZero(r.d_bj_liang), blankToZero(r.d_bj_ci),
+      Number(blankToZero(r.d_hj_y)), blankToZero(r.d_hj_liang), blankToZero(r.d_hj_ci),
+      Number(blankToZero(r.d_pj_y)), blankToZero(r.d_pj_liang), blankToZero(r.d_pj_ci),
+      r.sbp||'', r.dbp||'', r.cap||'', r.waist||'', r.hip||'', r.grip||'',
+      Number(r.drug_dm||0), Number(r.drug_bp||0), Number(r.drug_lip||0),
+      r.alt||'', r.ggt||'', r.ast||'', r.tg||'', r.hdl||'', r.fpg||'', r.hba1c||'', r.fins||'', r.crp||'', r.hbsag||'', r.hcv||'',
+      Number(r.exc1||0), Number(r.exc2||0), Number(r.exc3||0), Number(r.exc4||0), Number(r.join||0), Number(r.consent||0),
+      '','','','','','','','','','','','','','','','','','','','','','','',''
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  records.forEach((r, index) => {
+    const rowNo = index + 2;
+    const setF = (colIndex, formula) => {
+      const addr = `${excelCol(colIndex)}${rowNo}`;
+      ws[addr] = { t:'n', f:formula };
+    };
+    const sex=`D${rowNo}`, height=`G${rowNo}`, weight=`H${rowNo}`;
+    const q1=`I${rowNo}`,q2=`J${rowNo}`,q3=`K${rowNo}`,q4=`L${rowNo}`,q5=`M${rowNo}`;
+    const q6=`N${rowNo}`,q7=`O${rowNo}`,q8=`P${rowNo}`,q9=`Q${rowNo}`,q10=`R${rowNo}`;
+    const bjY=`S${rowNo}`,bjL=`T${rowNo}`,bjC=`U${rowNo}`;
+    const hjY=`V${rowNo}`,hjL=`W${rowNo}`,hjC=`X${rowNo}`;
+    const pjY=`Y${rowNo}`,pjL=`Z${rowNo}`,pjC=`AA${rowNo}`;
+    const sbp=`AB${rowNo}`,dbp=`AC${rowNo}`,cap=`AD${rowNo}`,waist=`AE${rowNo}`,hip=`AF${rowNo}`;
+    const drugDm=`AH${rowNo}`,drugBp=`AI${rowNo}`,drugLip=`AJ${rowNo}`;
+    const alt=`AK${rowNo}`,ggt=`AL${rowNo}`;
+    const tg=`AN${rowNo}`,hdl=`AO${rowNo}`;
+    const fpg=`AP${rowNo}`,hba1c=`AQ${rowNo}`,fins=`AR${rowNo}`,crp=`AS${rowNo}`;
+    setF(54,`ROUND(${q1}*20%+${q2}*10%+${q3}*5%+${q4}*5%+${q5}*10%+${q6}*10%+${q7}*5%+${q8}*15%+${q9}*10%+${q10}*10%,1)`);
+    setF(55,`ROUND(((${bjY}*${bjL}*${bjC}*25)+(${hjY}*${hjL}*${hjC}*6)+(${pjY}*${pjL}*${pjC}*2))*0.7936,2)`);
+    setF(56,`IF(OR(${height}="",${weight}=""),"",ROUND(${weight}/((${height}/100)^2),2))`);
+    setF(57,`IF(OR(${waist}="",${hip}=""),"",ROUND(${waist}/${hip},2))`);
+    setF(58,`IF(OR(${fpg}="",${fins}=""),"",ROUND(${fpg}*${fins}/22.5,2))`);
+    setF(59,`IF(BB${rowNo}>=29,1,0)`);
+    setF(60,`IF(OR(AND(${alt}>=48,${alt}<=200),AND(${ggt}>=60,${ggt}<=250)),1,0)`);
+    setF(61,`IF(AND(BK${rowNo}=0,OR(AND(BJ${rowNo}=1,OR(BD${rowNo}>=24,BM${rowNo}=1,BN${rowNo}=1)),${Number(r.fatty_liver||0)}=1)),1,0)`);
+    setF(62,`IF(${cap}>=238,1,0)`);
+    setF(63,`IF(${sex}="男",IF(BC${rowNo}>140,1,0),IF(${sex}="女",IF(BC${rowNo}>70,1,0),0))`);
+    setF(64,`IF(BD${rowNo}>=24,1,0)`);
+    setF(65,`IF(OR(${fpg}>=7.0,${hba1c}>=6.5,${drugDm}=1,${r.t2dm||0}=1),1,0)`);
+    setF(66,`IF(BO${rowNo}>=2,1,0)`);
+    setF(67,`SUM(BP${rowNo}:BS${rowNo},BT${rowNo},BW${rowNo}:BY${rowNo})`);
+    setF(68,`IF(OR(AND(${sex}="男",${waist}>=90),AND(${sex}="女",${waist}>=80)),1,0)`);
+    setF(69,`IF(OR(${sbp}>=130,${dbp}>=85,${drugBp}=1),1,0)`);
+    setF(70,`IF(OR(${tg}>1.7,${drugLip}=1),1,0)`);
+    setF(71,`IF(OR(AND(${sex}="男",${hdl}<>"",${hdl}<1.0),AND(${sex}="女",${hdl}<>"",${hdl}<1.3),${drugLip}=1),1,0)`);
+    setF(72,`IF(OR(AND(${fpg}>=5.6,${fpg}<=6.9),AND(${hba1c}>=5.7,${hba1c}<=6.4)),1,0)`);
+    setF(73,`IF(${fpg}>=5.6,1,0)`);
+    setF(74,`IF(${hba1c}>=5.7,1,0)`);
+    setF(75,`IF(BF${rowNo}>2.5,1,0)`);
+    setF(76,`IF(${crp}>2,1,0)`);
+    setF(77,`${r.alt_long||0}`);
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "初筛数据");
+  XLSX.writeFile(wb, "脂肪肝项目初筛表.xlsx");
+}
+</script>
+</body>
+</html>
