@@ -109,6 +109,10 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;color:#333;font
 </div>
 
 <div id="tab-form" class="tab-content active">
+<div class="btn-bar" style="margin-bottom:16px">
+  <button class="btn btn-primary" onclick="addRecord()">✅ 添加至导出列表</button>
+  <button class="btn btn-gray" onclick="resetForm()">🔄 清空表单</button>
+</div>
   <div class="card">
     <div class="card-title">基本信息</div>
     <div class="form-grid">
@@ -591,15 +595,18 @@ function addRecord() {
   };
 
   if (editIdx > -1) {
-    records[editIdx] = record;
-    editIdx = -1;
-    const btn = document.querySelector('.btn-primary');
-    if (btn) btn.innerHTML = '✅ 添加至导出列表';
-    alert(`✅ 修改成功：${name}`);
-  } else {
-    records.push(record);
-    alert(`✅ 添加成功：${name}（当前共 ${records.length} 条记录）`);
-  }
+  records[editIdx] = record;
+  editIdx = -1;
+
+  document.querySelectorAll('.btn-primary').forEach(btn => {
+    btn.innerHTML = '✅ 添加至导出列表';
+  });
+
+  alert(`✅ 修改成功：${name}`);
+} else {
+  records.push(record);
+  alert(`✅ 添加成功：${name}（当前共 ${records.length} 条记录）`);
+}
   saveRecords();
   resetForm(true);
 }
@@ -607,8 +614,9 @@ function addRecord() {
 function resetForm(skipConfirm = false) {
   if (!skipConfirm && !confirm('确认清空当前表单？已添加的记录不受影响。')) return;
   editIdx = -1;
-  const btn = document.querySelector('.btn-primary');
-  if (btn) btn.innerHTML = '✅ 添加至导出列表';
+  document.querySelectorAll('.btn-primary').forEach(btn => {
+  btn.innerHTML = '✅ 添加至导出列表';
+});
   ['f_sn','f_name','f_age','f_nation','f_phone',
    'f_height','f_weight','f_waist','f_hip','f_grip',
    'f_sbp','f_dbp','f_cap','f_alt','f_ggt','f_ast',
@@ -693,8 +701,9 @@ function editRecord(idx) {
   if (!r) return;
   editIdx = idx;
   switchTab('form');
-  const btn = document.querySelector('.btn-primary');
-  if (btn) btn.innerHTML = '💾 保存修改';
+  document.querySelectorAll('.btn-primary').forEach(btn => {
+  btn.innerHTML = '💾 保存修改';
+});
   const inputMap = {
     f_sn:'sn', f_name:'name', f_age:'age', f_nation:'nation', f_phone:'phone',
     f_height:'height', f_weight:'weight', f_waist:'waist', f_hip:'hip', f_grip:'grip',
