@@ -80,6 +80,8 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;color:#333;font
 .modal-box .modal-msg{font-size:15px;color:#333;margin-bottom:20px;font-weight:500}
 .modal-box .modal-btn{background:#1a6b3c;color:#fff;border:none;border-radius:6px;padding:8px 28px;font-size:14px;cursor:pointer;font-weight:500}
 .modal-box .modal-btn:hover{background:#155c33}
+/* 登录按钮加载态 */
+.btn-loading{opacity:.7;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -106,10 +108,6 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;color:#333;font
 </div>
 
 <div id="tab-form" class="tab-content active">
-<div class="btn-bar" style="margin-bottom:16px">
-  <button class="btn btn-primary" onclick="addRecord()">✅ 添加至导出列表</button>
-  <button class="btn btn-gray" onclick="resetForm()">🔄 清空表单</button>
-</div>
   <div class="card">
     <div class="card-title">基本信息</div>
     <div class="form-grid">
@@ -165,9 +163,7 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;color:#333;font
     <div id="drink_table_wrap" class="drink-disabled">
       <table class="drink-table">
         <thead>
-          <tr>
-            <th>酒类</th><th>是否喝</th><th>平均一次喝几两（两/次）</th><th>平均一周喝几次（次/周）</th>
-          </tr>
+          <tr><th>酒类</th><th>是否喝</th><th>平均一次喝几两（两/次）</th><th>平均一周喝几次（次/周）</th></tr>
         </thead>
         <tbody>
           <tr>
@@ -307,9 +303,10 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;color:#333;font
       <input type="password" id="admin-pass" placeholder="请输入管理密码"
         style="border:1px solid #ccd;border-radius:5px;padding:7px 12px;font-size:14px;width:220px"
         onkeydown="if(event.key==='Enter')unlockAdmin()">
-      <button class="btn btn-primary" onclick="unlockAdmin()">解锁管理功能</button>
+      <button class="btn btn-primary" id="unlock-btn" onclick="unlockAdmin()">解锁管理功能</button>
     </div>
-    <div id="admin-tip" style="margin-top:8px;font-size:12px;color:#e53935;display:none">❌ 密码错误，请重试</div>
+    <!-- 错误提示：从 Worker 返回的消息动态填入 -->
+    <div id="admin-tip" style="margin-top:8px;font-size:12px;color:#e53935;display:none"></div>
   </div>
 
   <div id="admin-actions" style="display:none">
@@ -350,6 +347,9 @@ body{font-family:'Microsoft YaHei',sans-serif;background:#f0f4f8;color:#333;font
 </div>
 
 <script>
+// ★ 唯一需要你填写的地方：把 Worker 地址粘贴进来
+const WORKER_URL = "https://admin-login-api.bedaireldsoke.workers.dev";
+
 // ===== Firebase 配置 =====
 const firebaseConfig = {
   apiKey: "AIzaSyCR_U1gvWp5Sv3LqSoCSCvNyXOXdleOUiU",
@@ -361,12 +361,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const RECORDS_REF = db.ref('fatLiverRecords');
 
-const ADMIN_PASSWORD = 'yyk3020';
 let adminUnlocked = false;
-
-// ★ 核心修复：records 和 recordKeys 分开存储
 let records = [];
-let recordKeys = [];  // Firebase push() 生成的唯一key
+let recordKeys = [];
 
 RECORDS_REF.on('value', snap => {
   const val = snap.val();
@@ -381,26 +378,49 @@ RECORDS_REF.on('value', snap => {
   if (adminUnlocked) updatePreview();
 });
 
-// ★ 新增：追加写入，不再全量覆盖
-function saveNewRecord(record) {
-  RECORDS_REF.push(record);
+// ★ 核心改动：unlockAdmin 改为调用 Worker，不在前端比对密码
+async function unlockAdmin() {
+  const password = document.getElementById('admin-pass').value;
+  if (!password) return;
+
+  const btn = document.getElementById('unlock-btn');
+  const tipEl = document.getElementById('admin-tip');
+  btn.classList.add('btn-loading');
+  btn.textContent = '验证中…';
+  tipEl.style.display = 'none';
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      adminUnlocked = true;
+      document.getElementById('admin-actions').style.display = 'block';
+      document.getElementById('admin-lock-card').style.display = 'none';
+      updatePreview();
+    } else {
+      // Worker 返回的提示直接展示（包含剩余次数、封禁时间等）
+      tipEl.textContent = '❌ ' + data.message;
+      tipEl.style.display = 'block';
+      btn.classList.remove('btn-loading');
+      btn.textContent = '解锁管理功能';
+    }
+  } catch (e) {
+    tipEl.textContent = '❌ 网络错误，请检查连接后重试';
+    tipEl.style.display = 'block';
+    btn.classList.remove('btn-loading');
+    btn.textContent = '解锁管理功能';
+  }
 }
 
-// ★ 新增：按key更新单条
+function saveNewRecord(record) { RECORDS_REF.push(record); }
 function saveEditRecord(idx, record) {
   const key = recordKeys[idx];
   if (key) RECORDS_REF.child(key).set(record);
-}
-
-function unlockAdmin() {
-  if (document.getElementById('admin-pass').value === ADMIN_PASSWORD) {
-    adminUnlocked = true;
-    document.getElementById('admin-actions').style.display = 'block';
-    document.getElementById('admin-lock-card').style.display = 'none';
-    updatePreview();
-  } else {
-    document.getElementById('admin-tip').style.display = 'block';
-  }
 }
 
 function showModal(msg) {
@@ -415,8 +435,9 @@ function checkDuplicateName() {
   if (editIdx > -1) return;
   const name = document.getElementById('f_name').value.trim();
   if (!name) return;
-  const exists = records.some(r => r.name && r.name.trim() === name);
-  if (exists) showModal('提示：该姓名已录入过');
+  if (records.some(r => r.name && r.name.trim() === name)) {
+    showModal('提示：该姓名已录入过');
+  }
 }
 
 const PRO_QUESTIONS = [
@@ -450,7 +471,6 @@ function buildProTable() {
     tbody.appendChild(tr);
   });
 }
-
 window.onload = function() { buildProTable(); };
 
 function switchTab(name) {
@@ -501,51 +521,26 @@ function buildRecord() {
     sex: document.getElementById('f_sex').value,
     nation: document.getElementById('f_nation').value,
     phone: document.getElementById('f_phone').value,
-    d_bj_y: document.getElementById('d_bj_y').value,
-    d_bj_liang: document.getElementById('d_bj_liang').value,
-    d_bj_ci: document.getElementById('d_bj_ci').value,
-    d_hj_y: document.getElementById('d_hj_y').value,
-    d_hj_liang: document.getElementById('d_hj_liang').value,
-    d_hj_ci: document.getElementById('d_hj_ci').value,
-    d_pj_y: document.getElementById('d_pj_y').value,
-    d_pj_liang: document.getElementById('d_pj_liang').value,
-    d_pj_ci: document.getElementById('d_pj_ci').value,
-    d_other_name: document.getElementById('d_other_name').value,
-    d_other_y: document.getElementById('d_other_y').value,
-    d_other_liang: document.getElementById('d_other_liang').value,
-    d_other_ci: document.getElementById('d_other_ci').value,
+    d_bj_y: document.getElementById('d_bj_y').value, d_bj_liang: document.getElementById('d_bj_liang').value, d_bj_ci: document.getElementById('d_bj_ci').value,
+    d_hj_y: document.getElementById('d_hj_y').value, d_hj_liang: document.getElementById('d_hj_liang').value, d_hj_ci: document.getElementById('d_hj_ci').value,
+    d_pj_y: document.getElementById('d_pj_y').value, d_pj_liang: document.getElementById('d_pj_liang').value, d_pj_ci: document.getElementById('d_pj_ci').value,
+    d_other_name: document.getElementById('d_other_name').value, d_other_y: document.getElementById('d_other_y').value,
+    d_other_liang: document.getElementById('d_other_liang').value, d_other_ci: document.getElementById('d_other_ci').value,
     drinkYes: isDrink ? '是' : '否',
-    ...proScores,
-    proTotal: calcProScore(),
+    ...proScores, proTotal: calcProScore(),
     height, weight, bmi,
-    waist: document.getElementById('f_waist').value,
-    hip: document.getElementById('f_hip').value,
-    grip: document.getElementById('f_grip').value,
-    sbp: document.getElementById('f_sbp').value,
-    dbp: document.getElementById('f_dbp').value,
-    cap: document.getElementById('f_cap').value,
-    alt: document.getElementById('f_alt').value,
-    ggt: document.getElementById('f_ggt').value,
-    ast: document.getElementById('f_ast').value,
-    tg: document.getElementById('f_tg').value,
-    hdl: document.getElementById('f_hdl').value,
-    fpg, hba1c: document.getElementById('f_hba1c').value,
-    fins, homaIR,
-    crp: document.getElementById('f_crp').value,
-    hbsag: document.getElementById('f_hbsag').value,
-    hcv: document.getElementById('f_hcv').value,
-    drug_dm: document.getElementById('f_drug_dm').value,
-    drug_bp: document.getElementById('f_drug_bp').value,
-    drug_lip: document.getElementById('f_drug_lip').value,
-    t2dm: document.getElementById('f_t2dm').checked ? 1 : 0,
-    fatty_liver: document.getElementById('f_fatty_liver').checked ? 1 : 0,
+    waist: document.getElementById('f_waist').value, hip: document.getElementById('f_hip').value, grip: document.getElementById('f_grip').value,
+    sbp: document.getElementById('f_sbp').value, dbp: document.getElementById('f_dbp').value, cap: document.getElementById('f_cap').value,
+    alt: document.getElementById('f_alt').value, ggt: document.getElementById('f_ggt').value, ast: document.getElementById('f_ast').value,
+    tg: document.getElementById('f_tg').value, hdl: document.getElementById('f_hdl').value,
+    fpg, hba1c: document.getElementById('f_hba1c').value, fins, homaIR,
+    crp: document.getElementById('f_crp').value, hbsag: document.getElementById('f_hbsag').value, hcv: document.getElementById('f_hcv').value,
+    drug_dm: document.getElementById('f_drug_dm').value, drug_bp: document.getElementById('f_drug_bp').value, drug_lip: document.getElementById('f_drug_lip').value,
+    t2dm: document.getElementById('f_t2dm').checked ? 1 : 0, fatty_liver: document.getElementById('f_fatty_liver').checked ? 1 : 0,
     alt_long: document.getElementById('f_alt_long').checked ? 1 : 0,
-    exc1: document.getElementById('f_exc1').checked ? 1 : 0,
-    exc2: document.getElementById('f_exc2').checked ? 1 : 0,
-    exc3: document.getElementById('f_exc3').checked ? 1 : 0,
-    exc4: document.getElementById('f_exc4').checked ? 1 : 0,
-    join: document.getElementById('f_join').checked ? 1 : 0,
-    consent: document.getElementById('f_consent').checked ? 1 : 0,
+    exc1: document.getElementById('f_exc1').checked ? 1 : 0, exc2: document.getElementById('f_exc2').checked ? 1 : 0,
+    exc3: document.getElementById('f_exc3').checked ? 1 : 0, exc4: document.getElementById('f_exc4').checked ? 1 : 0,
+    join: document.getElementById('f_join').checked ? 1 : 0, consent: document.getElementById('f_consent').checked ? 1 : 0,
     time: new Date().toLocaleString('zh-CN')
   };
 }
@@ -554,15 +549,12 @@ function addRecord() {
   const name = document.getElementById('f_name').value.trim();
   if (!name) { alert('请填写患者姓名！'); return; }
   const record = buildRecord();
-
   if (editIdx > -1) {
-    // ★ 编辑：按key更新指定记录，不影响其他人
     saveEditRecord(editIdx, record);
     editIdx = -1;
     document.querySelectorAll('.btn-primary').forEach(btn => btn.innerHTML = '✅ 添加至导出列表');
     alert(`✅ 修改成功：${name}`);
   } else {
-    // ★ 新增：push追加，不覆盖任何已有数据
     saveNewRecord(record);
     alert(`✅ 添加成功：${name}`);
   }
@@ -588,39 +580,23 @@ function resetForm(skipConfirm = false) {
   const noRadio = document.querySelector('input[name="drink_overall"][value="no"]');
   if (noRadio) { noRadio.checked = true; toggleDrink(false); }
   PRO_QUESTIONS.forEach(q => {
-    const sel = document.getElementById('pro_' + q.id);
-    if (sel) sel.selectedIndex = 0;
+    const sel = document.getElementById('pro_' + q.id); if (sel) sel.selectedIndex = 0;
   });
 }
 
 let searchKeyword = '';
-function doSearch() {
-  searchKeyword = document.getElementById('search-input').value.trim();
-  updatePreview();
-}
-function clearSearch() {
-  searchKeyword = '';
-  document.getElementById('search-input').value = '';
-  document.getElementById('search-hint').textContent = '';
-  updatePreview();
-}
+function doSearch() { searchKeyword = document.getElementById('search-input').value.trim(); updatePreview(); }
+function clearSearch() { searchKeyword = ''; document.getElementById('search-input').value = ''; document.getElementById('search-hint').textContent = ''; updatePreview(); }
 
 function updatePreview() {
   const tbody = document.getElementById('preview-tbody');
   if (!tbody) return;
   const countEl = document.getElementById('rec-count');
   if (countEl) countEl.textContent = records.length;
-
   let filtered = records.map((r, i) => ({ r, i }));
-  if (searchKeyword) {
-    filtered = filtered.filter(({ r }) => r.name && r.name.includes(searchKeyword));
-  }
-
+  if (searchKeyword) filtered = filtered.filter(({ r }) => r.name && r.name.includes(searchKeyword));
   const hintEl = document.getElementById('search-hint');
-  if (hintEl) {
-    hintEl.textContent = searchKeyword ? `共找到 ${filtered.length} 条包含"${searchKeyword}"的记录` : '';
-  }
-
+  if (hintEl) hintEl.textContent = searchKeyword ? `共找到 ${filtered.length} 条包含"${searchKeyword}"的记录` : '';
   if (!filtered.length) {
     tbody.innerHTML = `<tr><td colspan="9" class="empty-hint">${searchKeyword ? '未找到匹配记录' : '暂无记录，请先填写问卷并添加'}</td></tr>`;
     return;
@@ -639,7 +615,6 @@ function updatePreview() {
 
 function deleteRecord(idx) {
   if (!confirm('确认删除该条记录？')) return;
-  // ★ 按key删除，不影响其他记录
   const key = recordKeys[idx];
   if (key) RECORDS_REF.child(key).remove();
 }
@@ -651,49 +626,36 @@ function editRecord(idx) {
   switchTab('form');
   document.querySelectorAll('.btn-primary').forEach(btn => btn.innerHTML = '💾 保存修改');
   const inputMap = {
-    f_sn:'sn', f_name:'name', f_age:'age', f_nation:'nation', f_phone:'phone',
+    f_sn:'sn', f_name:'name', f_age:'age', f_nation:'nation', f_phone:'phone', f_source:'source',
     f_height:'height', f_weight:'weight', f_waist:'waist', f_hip:'hip', f_grip:'grip',
     f_sbp:'sbp', f_dbp:'dbp', f_cap:'cap',
     f_alt:'alt', f_ggt:'ggt', f_ast:'ast', f_tg:'tg', f_hdl:'hdl',
     f_fpg:'fpg', f_hba1c:'hba1c', f_fins:'fins', f_crp:'crp',
-    f_source:'source',
-    d_bj_liang:'d_bj_liang', d_bj_ci:'d_bj_ci',
-    d_hj_liang:'d_hj_liang', d_hj_ci:'d_hj_ci',
-    d_pj_liang:'d_pj_liang', d_pj_ci:'d_pj_ci',
-    d_other_liang:'d_other_liang', d_other_ci:'d_other_ci', d_other_name:'d_other_name'
+    d_bj_liang:'d_bj_liang', d_bj_ci:'d_bj_ci', d_hj_liang:'d_hj_liang', d_hj_ci:'d_hj_ci',
+    d_pj_liang:'d_pj_liang', d_pj_ci:'d_pj_ci', d_other_liang:'d_other_liang', d_other_ci:'d_other_ci', d_other_name:'d_other_name'
   };
-  Object.keys(inputMap).forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = r[inputMap[id]] !== undefined ? r[inputMap[id]] : '';
-  });
+  Object.keys(inputMap).forEach(id => { const el = document.getElementById(id); if (el) el.value = r[inputMap[id]] !== undefined ? r[inputMap[id]] : ''; });
   const selectMap = {
     f_sex:'sex', f_hbsag:'hbsag', f_hcv:'hcv',
     f_drug_dm:'drug_dm', f_drug_bp:'drug_bp', f_drug_lip:'drug_lip',
     d_bj_y:'d_bj_y', d_hj_y:'d_hj_y', d_pj_y:'d_pj_y', d_other_y:'d_other_y'
   };
-  Object.keys(selectMap).forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = r[selectMap[id]] !== undefined ? String(r[selectMap[id]]) : '';
-  });
+  Object.keys(selectMap).forEach(id => { const el = document.getElementById(id); if (el) el.value = r[selectMap[id]] !== undefined ? String(r[selectMap[id]]) : ''; });
   ['f_t2dm','f_fatty_liver','f_alt_long','f_exc1','f_exc2','f_exc3','f_exc4','f_join','f_consent'].forEach(id => {
-    const key = id.replace('f_','');
-    const el = document.getElementById(id);
+    const key = id.replace('f_',''); const el = document.getElementById(id);
     if (el) el.checked = Number(r[key] || 0) === 1;
   });
   const drinkVal = r.drinkYes === '是' ? 'yes' : 'no';
   const radio = document.querySelector(`input[name="drink_overall"][value="${drinkVal}"]`);
   if (radio) { radio.checked = true; toggleDrink(drinkVal === 'yes'); }
-  PRO_QUESTIONS.forEach(q => {
-    const sel = document.getElementById('pro_' + q.id);
-    if (sel) sel.value = r[q.id] !== undefined ? String(r[q.id]) : '0';
-  });
+  PRO_QUESTIONS.forEach(q => { const sel = document.getElementById('pro_' + q.id); if (sel) sel.value = r[q.id] !== undefined ? String(r[q.id]) : '0'; });
 }
 
 function clearAll() {
   if (!adminUnlocked) { alert('请先输入管理密码解锁！'); return; }
   if (!records.length) { alert('暂无记录！'); return; }
   if (!confirm(`确认清空全部 ${records.length} 条记录？此操作不可恢复！`)) return;
-  RECORDS_REF.set(null);  // 清空整个节点
+  RECORDS_REF.set(null);
 }
 
 function excelCol(n) {
@@ -706,7 +668,6 @@ function exportExcel() {
   if (!adminUnlocked) { alert('请先输入管理密码解锁！'); return; }
   if (!records.length) { alert('暂无数据，请先添加记录！'); return; }
   if (typeof XLSX === 'undefined') { alert('XLSX 库未加载，请检查网络连接后刷新页面！'); return; }
-
   const headers = [
     '序号','来源','姓名','年龄','性别','民族','手机号','身高(cm)','体重(kg)',
     'Q1(权重20%)','Q2(权重10%)','Q3(权重5%)','Q4(权重5%)','Q5(权重10%)','Q6(权重10%)','Q7(权重5%)','Q8(权重15%)','Q9(权重10%)','Q10(权重10%)',
@@ -717,7 +678,6 @@ function exportExcel() {
     '疾病①肝病类(1=否)','疾病②内分泌肾病(1=否)','疾病③妊娠备孕(1=否)','疾病④心脑血管(1=否)','是否参与研究(1=是)','签署知情同意(1=是)',
     'PRO总分','每周酒精摄入量(g)','BMI','腰臀比','HOMA-IR','PRO总分≥29(1=是)','ALT或γ-GT异常(1=是)','符合MASLD诊断(1=是)','CAP异常(1=是)','饮酒是否超过男140g/周、女70g/周(1=是)','超重(1=是)','2型糖尿病(1=是)','代谢异常(1=是)','代谢异常项数','腰围异常(1=是)','血压异常(1=是)','TG异常(1=是)','HDL-C异常(1=是)','糖尿病前期(1=是)','FPG异常(1=是)','HbA1c异常(1=是)','胰岛素抵抗指数HOMA-IR异常(1=是)','hs-CRP异常(1=是)','AST或ALT持续升高≥6个月(1=是)'
   ];
-
   const wsData = [headers];
   records.forEach(r => {
     const blankToZero = v => (v === undefined || v === null || v === '') ? 0 : v;
@@ -734,15 +694,10 @@ function exportExcel() {
       '','','','','','','','','','','','','','','','','','','','','','','',''
     ]);
   });
-
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-
   records.forEach((r, index) => {
     const rowNo = index + 2;
-    const setF = (colIndex, formula) => {
-      const addr = `${excelCol(colIndex)}${rowNo}`;
-      ws[addr] = { t:'n', f:formula };
-    };
+    const setF = (colIndex, formula) => { ws[`${excelCol(colIndex)}${rowNo}`] = { t:'n', f:formula }; };
     const sex=`E${rowNo}`, height=`H${rowNo}`, weight=`I${rowNo}`;
     const q1=`J${rowNo}`,q2=`K${rowNo}`,q3=`L${rowNo}`,q4=`M${rowNo}`,q5=`N${rowNo}`;
     const q6=`O${rowNo}`,q7=`P${rowNo}`,q8=`Q${rowNo}`,q9=`R${rowNo}`,q10=`S${rowNo}`;
@@ -751,8 +706,7 @@ function exportExcel() {
     const pjY=`Z${rowNo}`,pjL=`AA${rowNo}`,pjC=`AB${rowNo}`;
     const sbp=`AC${rowNo}`,dbp=`AD${rowNo}`,cap=`AE${rowNo}`,waist=`AF${rowNo}`,hip=`AG${rowNo}`;
     const drugDm=`AI${rowNo}`,drugBp=`AJ${rowNo}`,drugLip=`AK${rowNo}`;
-    const alt=`AL${rowNo}`,ggt=`AM${rowNo}`;
-    const tg=`AO${rowNo}`,hdl=`AP${rowNo}`;
+    const alt=`AL${rowNo}`,ggt=`AM${rowNo}`,tg=`AO${rowNo}`,hdl=`AP${rowNo}`;
     const fpg=`AQ${rowNo}`,hba1c=`AR${rowNo}`,fins=`AS${rowNo}`,crp=`AT${rowNo}`;
     setF(55,`ROUND(${q1}*20%+${q2}*10%+${q3}*5%+${q4}*5%+${q5}*10%+${q6}*10%+${q7}*5%+${q8}*15%+${q9}*10%+${q10}*10%,1)`);
     setF(56,`ROUND(((${bjY}*${bjL}*${bjC}*25)+(${hjY}*${hjL}*${hjC}*6)+(${pjY}*${pjL}*${pjC}*2))*0.7936,2)`);
@@ -779,7 +733,6 @@ function exportExcel() {
     setF(77,`IF(${crp}>2,1,0)`);
     setF(78,`${r.alt_long||0}`);
   });
-
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "初筛数据");
   XLSX.writeFile(wb, "脂肪肝项目初筛表.xlsx");
